@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Multi-PDF Summarizer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>AI Multi-PDF Summarizer</h1>
+    <p class="subtitle">Upload multiple PDFs and generate concise summaries.</p>
+
+    <div class="card upload-card">
+      <label for="pdfFiles" class="upload-box">
+        <span class="upload-icon">📄</span>
+        <strong>Choose PDF files</strong>
+        <span>or click here to browse</span>
+      </label>
+      <input id="pdfFiles" type="file" accept="application/pdf" multiple hidden>
+      <div id="fileList" class="file-list"></div>
+      <button id="summarizeBtn">Generate Summary</button>
+      <p id="status"></p>
+    </div>
+
+    <div id="results"></div>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>

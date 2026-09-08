@@ -6,7 +6,7 @@ import pymupdf
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-app = FastAPI(title="Ultra-Lightweight Multi-PDF Summarizer")
+app = FastAPI(title="Multi-PDF Summarizer")
 
 app.add_middleware(
     CORSMiddleware,
@@ -103,7 +103,7 @@ def get_keywords(text, number=8):
 def read_root():
     return {
         "status": "Server running efficiently",
-        "message": "Go to http://127.0.0 to test your endpoints."
+        "message": "Backend is running. Visit /docs to test the API."
     }
 
 @app.get("/health")

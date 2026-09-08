@@ -1,6 +1,6 @@
 # AI Multi-PDF Summarizer
 
-A simple college-level PDF summarization project using HTML, CSS, Vanilla JavaScript, FastAPI, TF-IDF, Sentence Transformers, BERT embeddings and cosine similarity.
+A PDF summarization project using HTML, CSS, Vanilla JavaScript, FastAPI, TF-IDF, Sentence Transformers, BERT embeddings and cosine similarity.
 
 ## Folder Structure
 
@@ -26,44 +26,3 @@ pdf-summarizer/
 8. The three scores are combined.
 9. Cosine similarity removes repeated sentences.
 10. The most important original sentences become the extractive summary.
-
-## Run the backend
-
-Open a terminal in the `backend` folder:
-
-```bash
-python -m venv venv
-```
-
-Windows:
-
-```bash
-venv\Scripts\activate
-```
-
-Install packages:
-
-```bash
-pip install -r requirements.txt
-```
-
-Start FastAPI:
-
-```bash
-uvicorn main:app --reload
-```
-
-The API will run at `http://127.0.0.1:8000`.
-
-## Run the frontend
-
-Open `index.html` in a browser. If your browser blocks local requests, use VS Code Live Server.
-
-## API
-
-- `GET /health` checks whether FastAPI is running.
-- `POST /summarize` accepts multiple PDF files and returns summaries.
-
-## Important
-
-The first run can be slow because the Sentence Transformer and BERT models need to download and load. The models are loaded once when FastAPI starts.

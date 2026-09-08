@@ -1,4 +1,4 @@
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = "https://multiple-pdf-summarization-system-4qzl.onrender.com";
 
 const pdfFiles = document.getElementById("pdfFiles");
 const fileList = document.getElementById("fileList");

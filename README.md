@@ -1,5 +1,4 @@
-AI Multi-PDF Summarizer
-
+**AI Multi-PDF Summarizer**
 An AI-powered multi-PDF extractive summarization system built using HTML, CSS, Vanilla JavaScript, FastAPI, PyMuPDF, TF-IDF, NumPy, and Cosine Similarity.
 
 **Features:**

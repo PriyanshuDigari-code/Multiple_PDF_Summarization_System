@@ -21,23 +21,23 @@ An AI-powered multi-PDF extractive summarization system built using HTML, CSS, V
 
 ### Frontend
 
-* HTML
-* CSS
-* Vanilla JavaScript
+- HTML
+- CSS
+- Vanilla JavaScript
 
 ### Backend
 
-* Python
-* FastAPI
-* Uvicorn
+- Python
+- FastAPI
+- Uvicorn
 
 ### NLP / Machine Learning
 
-* PyMuPDF
-* TF-IDF
-* Cosine Similarity
-* NumPy
-* Scikit-learn
+- PyMuPDF
+- TF-IDF
+- Cosine Similarity
+- NumPy
+- Scikit-learn
 
 ## Folder Structure
 
@@ -82,12 +82,12 @@ Health-check endpoint.
 
 Accepts multiple PDF files and returns:
 
-* Individual document summaries
-* Combined summary
-* Keywords
-* Page count
-* Original word count
-* Summary word count
+- Individual document summaries
+- Combined summary
+- Keywords
+- Page count
+- Original word count
+- Summary word count
 
 ## Project Purpose
 

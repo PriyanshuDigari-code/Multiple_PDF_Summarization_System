@@ -26,37 +26,47 @@ def extract_text(file_bytes):
     text_parts = []
 
     for page in document:
-        page_text = page.get_text()
-
-        if page_text:
-            text_parts.append(page_text)
+        blocks = page.get_text("blocks")
+        
+        for b in blocks:
+            if len(b) > 4:
+                block_text = str(b[4]).strip()
+            else:
+                continue
+            
+            if re.match(r'^[\d\s\+\-\,\.\(\)]+$', block_text) and len(block_text.split()) > 2:
+                continue
+                
+            if "Series 1" in block_text or "Item 1" in block_text:
+                continue
+                
+            if block_text:
+                text_parts.append(block_text)
 
     pages = len(document)
-
     document.close()
 
     return "\n".join(text_parts), pages
 
 def clean_text(text):
+    text = re.sub(r'(\w+)-\s*\n(\w+)', r'\1\2', text)
+    text = re.sub(r'(?<=\b\w)\s+(?=\w\b)', '', text)
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 
 def split_sentences(text):
-    sentences = re.split(
-        r"(?<=[.!?])\s+",
-        text
-    )
+    sentences = re.split(r'(?<!\b(?:Mr|St|Inc|Co|Gen)\.)(?<=[.!?])\s+(?=[A-Z0-9\(])', text)
 
-    return [
-        sentence.strip()
-        for sentence in sentences
-        if len(sentence.strip()) > 20
-    ]
+    cleaned_sentences = []
+    for sentence in sentences:
+        s = sentence.strip()
+        if len(s) > 25 and not s.isdigit():
+            cleaned_sentences.append(s)
+            
+    return cleaned_sentences
 
 def normalize(values):
-
     values = np.asarray(values)
-
     minimum = np.min(values)
     maximum = np.max(values)
 
@@ -66,11 +76,9 @@ def normalize(values):
     return (values - minimum) / (maximum - minimum)
 
 def create_summary(sentences):
-
     if not sentences:
         return []
 
-    
     if len(sentences) <= 3:
         return sentences
 
@@ -79,24 +87,15 @@ def create_summary(sentences):
     )
 
     try:
-
         matrix = vectorizer.fit_transform(
             sentences
         ).toarray()
-
     except ValueError:
-
         return sentences[:3]
 
-    
     tfidf_scores = matrix.sum(axis=1)
-
     document_centroid = matrix.mean(axis=0).reshape(1, -1)
-
-    similarity_scores = cosine_similarity(
-        matrix,
-        document_centroid
-    ).flatten()
+    similarity_scores = cosine_similarity(matrix, document_centroid).flatten()
 
     final_scores = (
         0.5 * normalize(tfidf_scores)
@@ -112,19 +111,14 @@ def create_summary(sentences):
         )
     )
 
-    ranked_indices = np.argsort(
-        final_scores
-    )[::-1]
-
+    ranked_indices = np.argsort(final_scores)[::-1]
     selected_indices = []
 
     for index in ranked_indices:
-
         if len(selected_indices) >= number_to_select:
             break
 
         if not selected_indices:
-
             selected_indices.append(index)
             continue
 
@@ -134,7 +128,6 @@ def create_summary(sentences):
         ).flatten()
 
         if np.max(similarities) < 0.60:
-
             selected_indices.append(index)
 
     selected_indices.sort()
@@ -145,28 +138,22 @@ def create_summary(sentences):
     ]
 
 def get_keywords(text, number=8):
-
     vectorizer = TfidfVectorizer(
         stop_words="english",
         max_features=number
     )
 
     try:
-
         vectorizer.fit_transform([text])
-
         return list(
             vectorizer.get_feature_names_out()
         )
-
     except ValueError:
-
         return []
 
 
 @app.get("/")
 def read_root():
-
     return {
         "status": "Server running efficiently",
         "message": "Backend is running. Visit /docs to test the API."
@@ -175,7 +162,6 @@ def read_root():
 
 @app.get("/health")
 def health():
-
     return {
         "status": "Backend running efficiently"
     }
@@ -184,43 +170,30 @@ def health():
 async def summarize(
     files: List[UploadFile] = File(description="Upload your PDF files")
 ):
-
     if not files:
-
         raise HTTPException(
             status_code=400,
             detail="No PDF files uploaded."
         )
 
     documents = []
-
     all_original_sentences = []
 
-
     for file in files:
-
         filename = file.filename or "unknown.pdf"
 
         if not filename.lower().endswith(".pdf"):
-
             raise HTTPException(
                 status_code=400,
                 detail=f"{filename} is not a PDF."
             )
 
         try:
-
             file_bytes = await file.read()
-
-
-            text, pages = extract_text(
-                file_bytes
-            )
-
+            text, pages = extract_text(file_bytes)
             text = clean_text(text)
 
             if not text:
-
                 raise HTTPException(
                     status_code=400,
                     detail=f"No readable text found in {filename}."
@@ -229,45 +202,29 @@ async def summarize(
             sentences = split_sentences(text)
 
             if not sentences:
-
                 raise HTTPException(
                     status_code=400,
                     detail=f"Not enough text found in {filename}."
                 )
 
-            summary_sentences = create_summary(
-                sentences
-            )
-
-            summary = " ".join(
-                summary_sentences
-            )
-
-            all_original_sentences.extend(
-                sentences
-            )
+            summary_sentences = create_summary(sentences)
+            summary = " ".join(summary_sentences)
+            all_original_sentences.extend(sentences)
 
             documents.append(
                 {
                     "filename": filename,
                     "pages": pages,
-                    "original_words": len(
-                        text.split()
-                    ),
-                    "summary_words": len(
-                        summary.split()
-                    ),
+                    "original_words": len(text.split()),
+                    "summary_words": len(summary.split()),
                     "keywords": get_keywords(text),
                     "summary": summary
                 }
             )
 
         except HTTPException:
-
             raise
-
         except Exception as error:
-
             raise HTTPException(
                 status_code=500,
                 detail=str(error)
@@ -276,29 +233,15 @@ async def summarize(
     combined_summary = ""
 
     if all_original_sentences:
-
         try:
-
             vectorizer = TfidfVectorizer(
                 stop_words="english"
             )
 
-            matrix = vectorizer.fit_transform(
-                all_original_sentences
-            ).toarray()
-
-
+            matrix = vectorizer.fit_transform(all_original_sentences).toarray()
             tfidf_scores = matrix.sum(axis=1)
-
-            document_centroid = matrix.mean(
-                axis=0
-            ).reshape(1, -1)
-
-            similarity_scores = cosine_similarity(
-                matrix,
-                document_centroid
-            ).flatten()
-
+            document_centroid = matrix.mean(axis=0).reshape(1, -1)
+            similarity_scores = cosine_similarity(matrix, document_centroid).flatten()
 
             final_scores = (
                 0.5 * normalize(tfidf_scores)
@@ -310,25 +253,18 @@ async def summarize(
                 3,
                 min(
                     len(all_original_sentences),
-                    int(
-                        len(all_original_sentences) * 0.20
-                    )
+                    int(len(all_original_sentences) * 0.20)
                 )
             )
 
-            ranked_indices = np.argsort(
-                final_scores
-            )[::-1]
-
+            ranked_indices = np.argsort(final_scores)[::-1]
             selected_indices = []
 
             for index in ranked_indices:
-
                 if len(selected_indices) >= number_to_select:
                     break
 
                 if not selected_indices:
-
                     selected_indices.append(index)
                     continue
 
@@ -338,9 +274,7 @@ async def summarize(
                 ).flatten()
 
                 if np.max(similarities) < 0.60:
-
                     selected_indices.append(index)
-
 
             selected_indices.sort()
 
@@ -349,15 +283,10 @@ async def summarize(
                 for index in selected_indices
             ]
 
-            combined_summary = " ".join(
-                combined_sentences
-            )
+            combined_summary = " ".join(combined_sentences)
 
         except ValueError:
-
-            combined_summary = " ".join(
-                all_original_sentences[:10]
-            )
+            combined_summary = " ".join(all_original_sentences[:10])
 
     return {
         "documents": documents,

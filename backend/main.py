@@ -29,6 +29,7 @@ def extract_text(file_bytes):
         blocks = page.get_text("blocks")
         
         for b in blocks:
+            # Safe boundary check: Ensure the text index exists
             if len(b) > 4:
                 block_text = str(b[4]).strip()
             else:
@@ -55,16 +56,31 @@ def clean_text(text):
     return text.strip()
 
 def split_sentences(text):
-    pattern = r'(?<!\bMr\.)(?<!\bSt\.)(?<!\bCo\.)(?<!\bInc\.)(?<!\bGen\.)(?<=[.!?])\s+(?=[A-Z0-9\(])'
-    sentences = re.split(pattern, text)
-
-    cleaned_sentences = []
-    for sentence in sentences:
-        s = sentence.strip()
-        if len(s) > 25 and not s.isdigit():
-            cleaned_sentences.append(s)
+    raw_splits = re.split(r'(?<=[.!?])\s+', text)
+    
+    abbreviations = {"mr.", "st.", "inc.", "co.", "gen.", "dr.", "vs."}
+    
+    sentences = []
+    buffer = []
+    
+    for part in raw_splits:
+        buffer.append(part)
+        last_word = part.split()[-1].lower() if part.split() else ""
+        if last_word in abbreviations:
+            continue
+        
+        complete_sentence = " ".join(buffer).strip()
+        buffer = []
+        
+        if len(complete_sentence) > 25 and not complete_sentence.isdigit():
+            sentences.append(complete_sentence)
             
-    return cleaned_sentences
+    if buffer:
+        remaining_sentence = " ".join(buffer).strip()
+        if len(remaining_sentence) > 25 and not remaining_sentence.isdigit():
+            sentences.append(remaining_sentence)
+            
+    return sentences
 
 def normalize(values):
     values = np.asarray(values)

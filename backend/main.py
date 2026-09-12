@@ -1,5 +1,6 @@
 import re
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from typing import Annotated, List
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 import numpy as np
 import pymupdf
@@ -181,7 +182,7 @@ def health():
 
 @app.post("/summarize")
 async def summarize(
-    files: list[UploadFile] = File(...)
+    files: List[UploadFile] = File(description="Upload your PDF files")
 ):
 
     if not files:

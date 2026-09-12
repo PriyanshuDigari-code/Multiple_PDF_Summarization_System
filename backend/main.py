@@ -55,7 +55,8 @@ def clean_text(text):
     return text.strip()
 
 def split_sentences(text):
-    sentences = re.split(r'(?<!\b(?:Mr|St|Inc|Co|Gen)\.)(?<=[.!?])\s+(?=[A-Z0-9\(])', text)
+    pattern = r'(?<!\bMr\.)(?<!\bSt\.)(?<!\bCo\.)(?<!\bInc\.)(?<!\bGen\.)(?<=[.!?])\s+(?=[A-Z0-9\(])'
+    sentences = re.split(pattern, text)
 
     cleaned_sentences = []
     for sentence in sentences:

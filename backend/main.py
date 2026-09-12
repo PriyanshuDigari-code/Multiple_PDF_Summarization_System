@@ -29,19 +29,21 @@ def extract_text(file_bytes):
         blocks = page.get_text("blocks")
         
         for b in blocks:
-            if len(b) > 4:
-                block_text = str(b[4]).strip() + " "
+            if isinstance(b, tuple) and len(b) > 4:
+                block_text = str(b[4]).strip()
+            elif isinstance(b, str):
+                block_text = b.strip()
             else:
                 continue
             
-            if re.match(r'^[\d\s\+\-\,\.\(\)]+$', block_text) and len(block_text.split()) > 2:
+            if re.match(r'^[\d\s\+\-\,\.\(\)]+$', block_text) and len(block_text.split()) > 1:
                 continue
                 
             if "Series 1" in block_text or "Item 1" in block_text:
                 continue
                 
-            if block_text.strip():
-                text_parts.append(block_text)
+            if block_text:
+                text_parts.append(block_text + " ")
 
     pages = len(document)
     document.close()
@@ -50,13 +52,13 @@ def extract_text(file_bytes):
 
 def clean_text(text):
     text = re.sub(r'(\w+)-\s*\n(\w+)', r'\1\2', text)
-    text = re.sub(r'(?<=\b\w)\s+(?=\w\b)', '', text)
-    text = re.sub(r"\s+", " ", text)
+
+    text = re.sub(r'\s+', ' ', text)
+    
     return text.strip()
 
 def split_sentences(text):
     raw_splits = re.split(r'(?<=[.!?])\s+', text)
-    
     abbreviations = {"mr.", "st.", "inc.", "co.", "gen.", "dr.", "vs."}
     
     sentences = []

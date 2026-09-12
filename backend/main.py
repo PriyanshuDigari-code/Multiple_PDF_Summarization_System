@@ -29,9 +29,8 @@ def extract_text(file_bytes):
         blocks = page.get_text("blocks")
         
         for b in blocks:
-            # Safe boundary check: Ensure the text index exists
             if len(b) > 4:
-                block_text = str(b[4]).strip()
+                block_text = str(b[4]).strip() + " "
             else:
                 continue
             
@@ -41,7 +40,7 @@ def extract_text(file_bytes):
             if "Series 1" in block_text or "Item 1" in block_text:
                 continue
                 
-            if block_text:
+            if block_text.strip():
                 text_parts.append(block_text)
 
     pages = len(document)

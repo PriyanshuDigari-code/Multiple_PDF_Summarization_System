@@ -9,8 +9,21 @@ const results = document.getElementById("results");
 let selectedFiles = [];
 
 pdfFiles.addEventListener("change", function () {
-  selectedFiles = Array.from(pdfFiles.files);
+  const newFiles = Array.from(pdfFiles.files);
+  
+  newFiles.forEach(newFile => {
+    const isDuplicate = selectedFiles.some(
+      existingFile => existingFile.name === newFile.name && existingFile.size === newFile.size
+    );
+    
+    if (!isDuplicate) {
+      selectedFiles.push(newFile);
+    }
+  });
+
   showFiles();
+  
+  pdfFiles.value = ""; 
 });
 
 function showFiles() {
@@ -60,6 +73,8 @@ summarizeBtn.addEventListener("click", async function () {
 });
 
 function displayResults(data) {
+  results.innerHTML = "";
+
   data.documents.forEach(doc => {
     const card = document.createElement("div");
     card.className = "result-card";
@@ -70,8 +85,14 @@ function displayResults(data) {
       <div class="keywords">${doc.keywords.map(word => `<span>${word}</span>`).join("")}</div>
       <h3>Summary</h3>
       <p class="summary">${doc.summary}</p>
-      <button class="download" onclick='downloadText(${JSON.stringify(doc.filename)}, ${JSON.stringify(doc.summary)})'>Download Summary</button>
     `;
+    
+    const dlBtn = document.createElement("button");
+    dlBtn.className = "download";
+    dlBtn.textContent = "Download Summary";
+    dlBtn.addEventListener("click", () => downloadText(doc.filename, doc.summary));
+    
+    card.appendChild(dlBtn);
     results.appendChild(card);
   });
 
@@ -80,8 +101,13 @@ function displayResults(data) {
   combined.innerHTML = `
     <h2>Combined Summary</h2>
     <p class="summary">${data.combined_summary}</p>
-    <button onclick='downloadText("combined-summary.txt", ${JSON.stringify(data.combined_summary)})'>Download Combined Summary</button>
   `;
+  
+  const dlCombinedBtn = document.createElement("button");
+  dlCombinedBtn.textContent = "Download Combined Summary";
+  dlCombinedBtn.addEventListener("click", () => downloadText("combined-summary.txt", data.combined_summary));
+  
+  combined.appendChild(dlCombinedBtn);
   results.appendChild(combined);
 }
 

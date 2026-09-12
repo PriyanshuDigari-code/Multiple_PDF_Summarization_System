@@ -52,9 +52,10 @@ def extract_text(file_bytes):
 
 def clean_text(text):
     text = re.sub(r'(\w+)-\s*\n(\w+)', r'\1\2', text)
-
-    text = re.sub(r'\s+', ' ', text)
     
+    text = re.sub(r'(?<=\b\w)\s+(?=\w\b)', '', text)
+    
+    text = re.sub(r"\s+", " ", text)
     return text.strip()
 
 def split_sentences(text):

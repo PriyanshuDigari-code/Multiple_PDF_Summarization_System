@@ -4,7 +4,7 @@
 
 body {
   margin: 0;
-  font-family: Arial, sans-serif;
+  font-family: Arial, Helvetica, sans-serif;
   background: #f4f6f8;
   color: #222;
 }
@@ -18,12 +18,14 @@ body {
 h1 {
   text-align: center;
   margin-bottom: 8px;
+  font-size: 32px;
 }
 
 .subtitle {
   text-align: center;
   color: #666;
   margin-bottom: 30px;
+  font-size: 16px;
 }
 
 .card,
@@ -43,9 +45,16 @@ h1 {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   cursor: pointer;
   background: #fafafa;
+  transition: 0.2s ease;
+}
+
+.upload-box:hover {
+  background: #f0f0f0;
+  border-color: #555;
 }
 
 .upload-icon {
@@ -57,8 +66,10 @@ h1 {
 }
 
 .file-item {
-  padding: 8px 0;
+  padding: 10px 0;
   border-bottom: 1px solid #eee;
+  min-height: 40px;
+  line-height: 24px;
 }
 
 button {
@@ -69,6 +80,11 @@ button {
   color: white;
   cursor: pointer;
   font-size: 15px;
+  transition: 0.2s ease;
+}
+
+button:hover {
+  background: #444;
 }
 
 button:disabled {
@@ -78,64 +94,89 @@ button:disabled {
 
 .remove-btn {
   float: right;
-  padding: 4px 8px;
+  padding: 5px 10px;
   background: #ddd;
   color: #222;
+  font-size: 13px;
+}
+
+.remove-btn:hover {
+  background: #ccc;
 }
 
 .meta {
   color: #666;
   font-size: 14px;
+  margin-bottom: 18px;
 }
 
-/* Keywords */
+.result-card h2,
+.combined-card h2 {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+.result-card h3,
+.combined-card h3 {
+  margin-top: 22px;
+  margin-bottom: 10px;
+}
+
 .keywords {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 15px;
+  margin: 10px 0 18px 0;
 }
 
 .keywords span {
   display: inline-block;
   background: #eee;
-  padding: 6px 10px;
+  padding: 6px 12px;
   border-radius: 15px;
   font-size: 14px;
+  line-height: 1.4;
+  white-space: nowrap;
 }
 
-/* Summary text */
 .summary {
   line-height: 1.7;
   white-space: pre-line;
-  word-wrap: break-word;
+  color: #333;
+  font-size: 15px;
 }
 
-/* Download button */
 .download {
   margin-top: 12px;
 }
 
-/* Status */
-#status {
-  margin-top: 15px;
-  font-weight: bold;
-}
-
-/* Combined summary */
 .combined-card {
   border-left: 5px solid #222;
 }
 
-.combined-card h2 {
-  margin-top: 0;
+.combined-card .summary {
+  line-height: 1.8;
 }
 
-/* Mobile */
+#status {
+  margin-top: 15px;
+  font-weight: bold;
+  color: #444;
+}
+
 @media (max-width: 600px) {
+
   .container {
     width: 94%;
     margin: 20px auto;
+  }
+
+  h1 {
+    font-size: 26px;
+  }
+
+  .subtitle {
+    font-size: 14px;
   }
 
   .card,
@@ -145,10 +186,19 @@ button:disabled {
   }
 
   .upload-box {
-    padding: 25px;
+    padding: 28px 15px;
   }
 
-  h1 {
-    font-size: 26px;
+  .file-item {
+    font-size: 14px;
+  }
+
+  button {
+    font-size: 14px;
+    padding: 10px 16px;
+  }
+
+  .summary {
+    font-size: 14px;
   }
 }

@@ -24,34 +24,113 @@ app.add_middleware(
 
 def extract_text(file_bytes):
     """
-    Extract readable text from a PDF.
+    Extract text from a PDF while preserving line breaks.
     """
 
-    document = pymupdf.open(
-        stream=file_bytes,
-        filetype="pdf"
-    )
-
-    text_parts = []
-
-    for page in document:
-
-        page_text = page.get_text("text")
-
-        if page_text:
-            text_parts.append(page_text)
+    try:
+        document = pymupdf.open(
+            stream=file_bytes,
+            filetype="pdf"
+        )
+    except Exception as error:
+        raise ValueError(
+            f"Could not open PDF: {str(error)}"
+        )
 
     pages = len(document)
 
+    page_texts = []
+
+    for page in document:
+
+        text = page.get_text(
+            "text",
+            sort=True
+        )
+
+        if text:
+            page_texts.append(text)
+
     document.close()
 
-    return "\n".join(text_parts), pages
+    return "\n".join(page_texts), pages
 
+
+def is_noise_line(line):
+    """
+    Detect common PDF extraction noise such as:
+    chart numbers, series labels and standalone numbers.
+    """
+
+    line = line.strip()
+
+    if not line:
+        return True
+
+    lower = line.lower()
+
+    chart_labels = {
+        "series 1",
+        "series 2",
+        "series 3",
+        "series 4",
+        "series 5",
+        "item 1",
+        "item 2",
+        "item 3",
+        "item 4",
+        "item 5",
+        "item 6",
+    }
+
+    if lower in chart_labels:
+        return True
+
+    if re.fullmatch(
+        r"[\d\s.,:%$+\-()/]+",
+        line
+    ):
+        return True
+
+    words = line.split()
+
+    if len(words) >= 3:
+
+        numeric_count = 0
+
+        for word in words:
+
+            cleaned = word.strip(
+                ".,:;()[]{}$%+-"
+            )
+
+            if re.fullmatch(
+                r"\d+(?:\.\d+)?",
+                cleaned
+            ):
+                numeric_count += 1
+
+        ratio = numeric_count / len(words)
+
+        if ratio >= 0.60:
+            return True
+
+    return False
 
 def clean_text(text):
     """
-    Clean common PDF formatting problems.
+    Clean common PDF extraction problems.
     """
+
+    text = text.replace(
+        "\r\n",
+        "\n"
+    )
+
+    text = text.replace(
+        "\r",
+        "\n"
+    )
 
     text = re.sub(
         r"(\w+)-\s*\n\s*(\w+)",
@@ -59,113 +138,167 @@ def clean_text(text):
         text
     )
 
-    text = re.sub(
-        r"([a-z]{3,})\s*\n\s*([a-z]{2,})",
-        r"\1 \2",
-        text
+    lines = []
+
+    for line in text.split("\n"):
+
+        line = line.strip()
+
+        if is_noise_line(line):
+            continue
+
+        lines.append(line)
+
+    cleaned_lines = []
+
+    for line in lines:
+
+        line = re.sub(
+            r"[ \t]+",
+            " ",
+            line
+        ).strip()
+
+        if line:
+            cleaned_lines.append(line)
+
+    return "\n".join(
+        cleaned_lines
     )
-
-    text = re.sub(
-        r"\s+",
-        " ",
-        text
-    )
-
-    return text.strip()
-
-
-def is_noisy_sentence(sentence):
-    """
-    Detect sentences that contain mostly numbers,
-    chart values, or other PDF extraction noise.
-    """
-
-    words = sentence.split()
-
-    if not words:
-        return True
-
-    numeric_tokens = 0
-
-    for word in words:
-
-        cleaned = word.strip(
-            ".,:;()[]{}$%+-"
-        )
-
-        if cleaned.replace(".", "", 1).isdigit():
-            numeric_tokens += 1
-
-   
-    if len(words) >= 3:
-
-        numeric_ratio = numeric_tokens / len(words)
-
-        if numeric_ratio > 0.60:
-            return True
-
-    noisy_patterns = [
-        "series 1",
-        "item 1",
-        "figure 1",
-        "chart 1",
-        "table 1",
-    ]
-
-    lower_sentence = sentence.lower()
-
-    for pattern in noisy_patterns:
-
-        if lower_sentence.strip() == pattern:
-            return True
-
-    return False
-
 
 def split_sentences(text):
     """
-    Split cleaned PDF text into meaningful sentences.
+    Convert PDF text into meaningful content units.
+
+    PDFs often have headings and paragraphs without
+    normal sentence formatting, so both line boundaries
+    and punctuation are considered.
     """
 
-    raw_sentences = re.split(
-        r"(?<=[.!?])\s+",
-        text
-    )
+    lines = text.split("\n")
 
     sentences = []
 
-    for sentence in raw_sentences:
+    current = ""
 
-        sentence = sentence.strip()
+    for line in lines:
+
+        line = line.strip()
+
+        if not line:
+            continue
+
+        if is_noise_line(line):
+            continue
+
+        is_heading = (
+            len(line) <= 80
+            and not line.endswith(
+                (".", "!", "?", ",")
+            )
+        )
+
+        if is_heading:
+
+            if current:
+
+                sentences.append(
+                    current.strip()
+                )
+
+                current = ""
+
+            if len(line) >= 20:
+                sentences.append(line)
+
+            continue
+
+        if not current:
+
+            current = line
+
+        else:
+
+            current += " " + line
+
+        parts = re.split(
+            r"(?<=[.!?])\s+",
+            current
+        )
+
+        if len(parts) > 1:
+
+            complete_parts = parts[:-1]
+
+            current = parts[-1]
+
+            for part in complete_parts:
+
+                part = part.strip()
+
+                if len(part) >= 25:
+
+                    sentences.append(part)
+
+    if current:
+
+        parts = re.split(
+            r"(?<=[.!?])\s+",
+            current
+        )
+
+        for part in parts:
+
+            part = part.strip()
+
+            if len(part) >= 25:
+
+                sentences.append(part)
+
+    final_sentences = []
+
+    for sentence in sentences:
+
+        sentence = re.sub(
+            r"\s+",
+            " ",
+            sentence
+        ).strip()
 
         if len(sentence) < 25:
             continue
 
-        if is_noisy_sentence(sentence):
+        if is_noise_line(sentence):
             continue
 
-        alphabetic_characters = sum(
+        alphabetic_count = sum(
             char.isalpha()
             for char in sentence
         )
 
-        if alphabetic_characters < 15:
+        if alphabetic_count < 15:
             continue
 
-        sentences.append(sentence)
+        final_sentences.append(
+            sentence
+        )
 
-    return sentences
-
+    return final_sentences
 
 def normalize(values):
 
     values = np.asarray(values)
 
+    if len(values) == 0:
+        return values
+
     minimum = np.min(values)
     maximum = np.max(values)
 
     if maximum == minimum:
-        return np.ones(len(values))
+        return np.ones(
+            len(values)
+        )
 
     return (
         values - minimum
@@ -173,10 +306,11 @@ def normalize(values):
         maximum - minimum
     )
 
-
 def rank_sentences(sentences):
     """
-    Calculate importance score for every sentence.
+    Rank sentences using:
+    1. TF-IDF importance
+    2. Similarity to document centroid
     """
 
     if not sentences:
@@ -186,7 +320,8 @@ def rank_sentences(sentences):
         return [(0, 1.0)]
 
     vectorizer = TfidfVectorizer(
-        stop_words="english"
+        stop_words="english",
+        token_pattern=r"(?u)\b[a-zA-Z][a-zA-Z]{2,}\b"
     )
 
     try:
@@ -199,12 +334,14 @@ def rank_sentences(sentences):
 
         return [
             (index, 1.0)
-            for index in range(len(sentences))
+            for index in range(
+                len(sentences)
+            )
         ]
 
-
-    tfidf_scores = matrix.sum(axis=1)
-
+    tfidf_scores = matrix.sum(
+        axis=1
+    )
 
     centroid = matrix.mean(
         axis=0
@@ -215,11 +352,14 @@ def rank_sentences(sentences):
         centroid
     ).flatten()
 
-
     final_scores = (
-        0.5 * normalize(tfidf_scores)
+        0.5 * normalize(
+            tfidf_scores
+        )
         +
-        0.5 * normalize(similarity_scores)
+        0.5 * normalize(
+            similarity_scores
+        )
     )
 
     ranked_indices = np.argsort(
@@ -227,18 +367,16 @@ def rank_sentences(sentences):
     )[::-1]
 
     return [
-        (int(index), float(final_scores[index]))
+        (
+            int(index),
+            float(final_scores[index])
+        )
         for index in ranked_indices
     ]
 
-
-# =========================================================
-# CREATE INDIVIDUAL SUMMARY
-# =========================================================
-
 def create_summary(sentences):
     """
-    Create an extractive summary for one PDF.
+    Create a concise extractive summary.
     """
 
     if not sentences:
@@ -247,12 +385,13 @@ def create_summary(sentences):
     if len(sentences) <= 3:
         return sentences
 
-    ranked = rank_sentences(sentences)
+    ranked = rank_sentences(
+        sentences
+    )
 
-    # Approximately 30% of sentences
     number_to_select = max(
         3,
-        int(len(sentences) * 0.30)
+        int(len(sentences) * 0.20)
     )
 
     number_to_select = min(
@@ -260,9 +399,9 @@ def create_summary(sentences):
         len(sentences)
     )
 
-    # We need the TF-IDF matrix again
     vectorizer = TfidfVectorizer(
-        stop_words="english"
+        stop_words="english",
+        token_pattern=r"(?u)\b[a-zA-Z][a-zA-Z]{2,}\b"
     )
 
     try:
@@ -273,7 +412,9 @@ def create_summary(sentences):
 
     except ValueError:
 
-        return sentences[:number_to_select]
+        return sentences[
+            :number_to_select
+        ]
 
     selected_indices = []
 
@@ -282,10 +423,12 @@ def create_summary(sentences):
         if len(selected_indices) >= number_to_select:
             break
 
-        # First sentence
         if not selected_indices:
 
-            selected_indices.append(index)
+            selected_indices.append(
+                index
+            )
+
             continue
 
         similarities = cosine_similarity(
@@ -293,23 +436,18 @@ def create_summary(sentences):
             matrix[selected_indices]
         ).flatten()
 
-        # Avoid highly repetitive sentences
-        if np.max(similarities) < 0.60:
+        if np.max(similarities) < 0.65:
 
-            selected_indices.append(index)
+            selected_indices.append(
+                index
+            )
 
-    # Restore original document order
     selected_indices.sort()
 
     return [
         sentences[index]
         for index in selected_indices
     ]
-
-
-# =========================================================
-# GET KEYWORDS
-# =========================================================
 
 def get_keywords(text, number=8):
 
@@ -321,47 +459,31 @@ def get_keywords(text, number=8):
 
     try:
 
-        matrix = vectorizer.fit_transform(
+        vectorizer.fit_transform(
             [text]
         )
 
-        if matrix.shape[1] == 0:
-            return []
-
-        keywords = list(
+        return list(
             vectorizer.get_feature_names_out()
         )
-
-        return keywords
 
     except ValueError:
 
         return []
 
-
-# =========================================================
-# COMBINED SUMMARY
-# =========================================================
-
 def create_combined_summary(
     document_sentences
 ):
     """
-    Create a combined summary while guaranteeing
-    that every uploaded PDF contributes information.
+    Create one summary from all uploaded PDFs.
 
-    document_sentences example:
-
-    [
-        [PDF1 sentence1, PDF1 sentence2, ...],
-        [PDF2 sentence1, PDF2 sentence2, ...]
-    ]
+    Every PDF gets a chance to contribute important
+    information to the final combined summary.
     """
 
     if not document_sentences:
         return ""
 
-    # Remove empty documents
     valid_documents = [
         sentences
         for sentences in document_sentences
@@ -371,86 +493,62 @@ def create_combined_summary(
     if not valid_documents:
         return ""
 
-    # -----------------------------------------------------
-    # SPECIAL CASE: only one PDF
-    # -----------------------------------------------------
 
     if len(valid_documents) == 1:
 
-        summary_sentences = create_summary(
+        summary = create_summary(
             valid_documents[0]
         )
 
-        return " ".join(summary_sentences)
+        return " ".join(summary)
 
-    # -----------------------------------------------------
-    # Calculate total number of sentences
-    # -----------------------------------------------------
-
-    total_sentences = sum(
-        len(sentences)
-        for sentences in valid_documents
-    )
-
-    # Around 20% of all sentences
-    total_to_select = max(
-        4,
-        int(total_sentences * 0.20)
-    )
-
-    total_to_select = min(
-        total_to_select,
-        total_sentences
-    )
-
-    # -----------------------------------------------------
-    # We guarantee at least 2 sentences from each PDF
-    # when possible.
-    # -----------------------------------------------------
-
-    selected_global_sentences = []
-
-    # Store sentences as:
-    #
-    # (document_number, sentence)
-    #
     all_sentences = []
 
-    for document_number, sentences in enumerate(
+    for document_index, sentences in enumerate(
         valid_documents
     ):
 
         for sentence in sentences:
 
             all_sentences.append(
-                (
-                    document_number,
-                    sentence
-                )
+                {
+                    "document": document_index,
+                    "text": sentence
+                }
             )
 
-    # -----------------------------------------------------
-    # Rank sentences from ALL documents together
-    # -----------------------------------------------------
-
     sentence_texts = [
-        item[1]
+        item["text"]
         for item in all_sentences
     ]
+
+    if not sentence_texts:
+        return ""
 
     ranked = rank_sentences(
         sentence_texts
     )
 
-    # -----------------------------------------------------
-    # TF-IDF matrix for similarity checking
-    # -----------------------------------------------------
+    total_sentences = len(
+        sentence_texts
+    )
+
+    number_to_select = max(
+        4,
+        int(total_sentences * 0.15)
+    )
+
+    number_to_select = min(
+        number_to_select,
+        total_sentences
+    )
+
+    vectorizer = TfidfVectorizer(
+        stop_words="english",
+        token_pattern=r"(?u)\b[a-zA-Z][a-zA-Z]{2,}\b"
+    )
 
     try:
-
-        vectorizer = TfidfVectorizer(
-            stop_words="english"
-        )
 
         matrix = vectorizer.fit_transform(
             sentence_texts
@@ -459,93 +557,66 @@ def create_combined_summary(
     except ValueError:
 
         return " ".join(
-            sentence_texts[:total_to_select]
+            sentence_texts[
+                :number_to_select
+            ]
         )
 
     selected_indices = []
 
-    # -----------------------------------------------------
-    # FIRST:
-    # Select important sentences from each document.
-    #
-    # This guarantees that PDF 1 and PDF 2 both
-    # contribute to the combined summary.
-    # -----------------------------------------------------
-
-    for document_number in range(
+    for document_index in range(
         len(valid_documents)
     ):
 
-        document_indices = [
-            index
-            for index, item in enumerate(
-                all_sentences
-            )
-            if item[0] == document_number
-        ]
+        candidates = []
 
-        if not document_indices:
+        for sentence_index, score in ranked:
+
+            if (
+                all_sentences[
+                    sentence_index
+                ]["document"]
+                == document_index
+            ):
+                candidates.append(
+                    sentence_index
+                )
+
+        if not candidates:
             continue
 
-        # Rank this document's sentences
-        document_ranked = sorted(
-            document_indices,
-            key=lambda index: dict(ranked).get(
-                index,
-                0
-            ),
-            reverse=True
-        )
-
-        # Try to select at least 2
-        # from each document.
-        sentences_needed = min(
-            2,
-            len(document_indices)
-        )
-
-        for index in document_ranked:
-
-            if len(selected_indices) >= total_to_select:
-                break
+        for index in candidates:
 
             if index in selected_indices:
                 continue
 
             if not selected_indices:
 
-                selected_indices.append(index)
-                continue
+                selected_indices.append(
+                    index
+                )
+
+                break
 
             similarities = cosine_similarity(
-                matrix[index].reshape(1, -1),
+                matrix[index].reshape(
+                    1,
+                    -1
+                ),
                 matrix[selected_indices]
             ).flatten()
 
-            if np.max(similarities) < 0.60:
+            if np.max(similarities) < 0.65:
 
-                selected_indices.append(index)
-
-            if (
-                sum(
-                    1
-                    for selected in selected_indices
-                    if all_sentences[selected][0]
-                    == document_number
+                selected_indices.append(
+                    index
                 )
-                >= sentences_needed
-            ):
-                break
 
-    # -----------------------------------------------------
-    # SECOND:
-    # Fill remaining slots using globally important
-    # sentences.
-    # -----------------------------------------------------
+                break
 
     for index, score in ranked:
 
-        if len(selected_indices) >= total_to_select:
+        if len(selected_indices) >= number_to_select:
             break
 
         if index in selected_indices:
@@ -553,50 +624,47 @@ def create_combined_summary(
 
         if not selected_indices:
 
-            selected_indices.append(index)
+            selected_indices.append(
+                index
+            )
+
             continue
 
         similarities = cosine_similarity(
-            matrix[index].reshape(1, -1),
+            matrix[index].reshape(
+                1,
+                -1
+            ),
             matrix[selected_indices]
         ).flatten()
 
-        if np.max(similarities) < 0.60:
+        if np.max(similarities) < 0.65:
 
-            selected_indices.append(index)
-
-    # -----------------------------------------------------
-    # Restore original PDF/sentence order
-    # -----------------------------------------------------
+            selected_indices.append(
+                index
+            )
 
     selected_indices.sort()
 
-    selected_global_sentences = [
-        all_sentences[index][1]
+    combined_sentences = [
+        all_sentences[index]["text"]
         for index in selected_indices
     ]
 
     return " ".join(
-        selected_global_sentences
+        combined_sentences
     )
-
-
-# =========================================================
-# ROOT
-# =========================================================
 
 @app.get("/")
 def read_root():
 
     return {
         "status": "Server running efficiently",
-        "message": "Backend is running. Visit /docs to test the API."
+        "message": (
+            "Backend is running. "
+            "Visit /docs to test the API."
+        )
     }
-
-
-# =========================================================
-# HEALTH CHECK
-# =========================================================
 
 @app.get("/health")
 def health():
@@ -605,19 +673,10 @@ def health():
         "status": "Backend running efficiently"
     }
 
-
-# =========================================================
-# SUMMARIZE
-# =========================================================
-
 @app.post("/summarize")
 async def summarize(
     files: List[UploadFile] = File(...)
 ):
-
-    # -----------------------------------------------------
-    # Check files
-    # -----------------------------------------------------
 
     if not files:
 
@@ -628,21 +687,7 @@ async def summarize(
 
     documents = []
 
-    # IMPORTANT:
-    # Keep sentences separated by PDF.
-    #
-    # Example:
-    #
-    # [
-    #   [PDF1 sentence1, PDF1 sentence2],
-    #   [PDF2 sentence1, PDF2 sentence2]
-    # ]
-    #
     document_sentences = []
-
-    # -----------------------------------------------------
-    # Process every PDF
-    # -----------------------------------------------------
 
     for file in files:
 
@@ -651,11 +696,9 @@ async def summarize(
             or "unknown.pdf"
         )
 
-        # -------------------------------------------------
-        # Check extension
-        # -------------------------------------------------
-
-        if not filename.lower().endswith(".pdf"):
+        if not filename.lower().endswith(
+            ".pdf"
+        ):
 
             raise HTTPException(
                 status_code=400,
@@ -664,39 +707,32 @@ async def summarize(
 
         try:
 
-            # ---------------------------------------------
-            # Read file
-            # ---------------------------------------------
-
             file_bytes = await file.read()
 
-            # ---------------------------------------------
-            # Extract text
-            # ---------------------------------------------
+            if not file_bytes:
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{filename} is empty."
+                )
 
             text, pages = extract_text(
                 file_bytes
             )
 
-            # ---------------------------------------------
-            # Clean text
-            # ---------------------------------------------
-
-            text = clean_text(text)
+            text = clean_text(
+                text
+            )
 
             if not text:
 
                 raise HTTPException(
                     status_code=400,
                     detail=(
-                        f"No readable text found in "
-                        f"{filename}."
+                        f"No readable text found "
+                        f"in {filename}."
                     )
                 )
-
-            # ---------------------------------------------
-            # Split into sentences
-            # ---------------------------------------------
 
             sentences = split_sentences(
                 text
@@ -712,10 +748,6 @@ async def summarize(
                     )
                 )
 
-            # ---------------------------------------------
-            # Individual PDF summary
-            # ---------------------------------------------
-
             summary_sentences = create_summary(
                 sentences
             )
@@ -724,17 +756,9 @@ async def summarize(
                 summary_sentences
             )
 
-            # ---------------------------------------------
-            # Store sentences separately
-            # ---------------------------------------------
-
             document_sentences.append(
                 sentences
             )
-
-            # ---------------------------------------------
-            # Store document result
-            # ---------------------------------------------
 
             documents.append(
                 {
@@ -754,14 +778,16 @@ async def summarize(
             )
 
         except HTTPException:
-
             raise
 
         except Exception as error:
 
             raise HTTPException(
                 status_code=500,
-                detail=str(error)
+                detail=(
+                    f"Error processing "
+                    f"{filename}: {str(error)}"
+                )
             )
 
     combined_summary = create_combined_summary(
